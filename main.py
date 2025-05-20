@@ -58,7 +58,7 @@ if page == "Home":
 
     col1, col2 = st.columns([1, 2])
     with col1:
-        st.image("Pic1.png", use_container_width=True)
+        st.image("Pic1.PNG", use_container_width=True)
     with col2:
         st.markdown("### 📂 Data Info")
         st.markdown("- ✅ **Data source:** Binance API (via `fetch_data.py`)")
