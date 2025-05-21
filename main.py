@@ -3,29 +3,13 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import plotly.express as px
-from statsmodels.tsa.stattools import adfuller
-import nolds
 import matplotlib.pyplot as plt
 from scipy.fft import fft
-from numpy import pi, sin
+from numpy import pi
 
 # Configuration
 DATA_DIR = Path("data")
 STABLECOINS = ["USDT", "USDC", "TUSD", "DAI", "PAX"]
-
-# Rolling d estimator using Hurst
-def rolling_d_estimates(prices, window=150):
-    hurst_vals = []
-    dates = []
-    for i in range(len(prices) - window + 1):
-        window_data = prices[i:i+window]
-        if window_data.nunique() <= 1:
-            hurst_vals.append(np.nan)
-        else:
-            h = nolds.hurst_rs(window_data)
-            hurst_vals.append(h - 0.5)
-        dates.append(prices.index[i + window - 1])
-    return pd.Series(hurst_vals, index=dates)
 
 def get_coin_name(ticker):
     names = {
@@ -61,13 +45,13 @@ if page == "Home":
         st.image("Pic1.PNG", use_container_width=True)
     with col2:
         st.markdown("### 📂 Data Info")
-        st.markdown("- ✅ **Data source:** Binance API (via `fetch_data.py`)")
-        st.markdown("- 📁 **CSV folder:** `./data/`")
+        st.markdown("- ✅ **Data source:** Binance API (via fetch_data.py)")
+        st.markdown("- 📁 **CSV folder:** ./data/")
         st.markdown("- 🕒 **Frequency:** Hourly historical prices")
         st.code("python fetch_data.py", language="bash")
 
     st.markdown("---")
-    st.markdown("🚀 **Start exploring from the sidebar.** Choose a section like `Price Analysis` or `Local Whittle Analysis`.")
+    st.markdown("🚀 **Start exploring from the sidebar.** Choose a section like Price Analysis or Local Whittle Analysis.")
 
 # ---------------- PRICES ----------------
 elif page == "Price Analysis":
@@ -79,7 +63,7 @@ elif page == "Price Analysis":
         cur = df_cur.at[coin, 'Price'] if coin in df_cur.index else None
         st.metric(f"{coin} Price (USD)", f"${cur:.4f}" if cur else "N/A")
     except FileNotFoundError:
-        st.error("Could not find 'prices.csv'. Please run `fetch_data.py` first.")
+        st.error("Could not find 'prices.csv'. Please run fetch_data.py first.")
 
     try:
         df_hist = pd.read_csv(DATA_DIR / f"history_{coin}.csv", parse_dates=['Timestamp']).set_index('Timestamp')
@@ -94,71 +78,6 @@ elif page == "Price Analysis":
 
     except FileNotFoundError:
         st.warning(f"Price history for {coin} not found.")
-
-# ---------------- DESCRIPTIVE STATS ----------------
-elif page == "Descriptive Statistics":
-    st.title("Descriptive Statistics of Stablecoins")
-
-    st.subheader("Table 1: Descriptive Statistics")
-    rows = []
-    for coin in STABLECOINS:
-        try:
-            df = pd.read_csv(DATA_DIR / f"history_{coin}.csv", parse_dates=["Timestamp"])
-            rows.append({
-                "Name": get_coin_name(coin),
-                "Ticker": coin,
-                "Market cap": "N/A",
-                "Start date": df["Timestamp"].min().date(),
-                "End date": df["Timestamp"].max().date(),
-                "No. obs": len(df),
-                "Mean": df["Price"].mean(),
-                "Median": df["Price"].median(),
-                "Std. Dev": df["Price"].std(),
-                "Max": df["Price"].max(),
-                "Min": df["Price"].min()
-            })
-        except Exception as e:
-            st.warning(f"Error with {coin}: {e}")
-    df_table1 = pd.DataFrame(rows)
-    df_table1 = df_table1[["Name", "Ticker", "Market cap", "Start date", "End date", "No. obs", "Mean", "Median", "Std. Dev", "Max", "Min"]]
-    st.dataframe(df_table1.style.format("{:.4f}", subset=["Mean", "Median", "Std. Dev", "Max", "Min"]))
-
-    st.subheader("Table 2: ADF Stationarity Test")
-    adf_rows = []
-    for coin in STABLECOINS:
-        try:
-            df = pd.read_csv(DATA_DIR / f"history_{coin}.csv")
-            dev = df["Price"] - 1.0
-            if dev.nunique() <= 1:
-                adf_rows.append({"Coin": coin, "ADF Stat": np.nan, "p-value": np.nan, "Stability": "Stable", "Note": "Constant series"})
-            else:
-                stat, pval, *_ = adfuller(dev.dropna())
-                stability = "Stable" if pval < 0.05 else "Unstable"
-                adf_rows.append({"Coin": coin, "ADF Stat": stat, "p-value": pval, "Stability": stability, "Note": ""})
-        except:
-            adf_rows.append({"Coin": coin, "ADF Stat": np.nan, "p-value": np.nan, "Stability": "Unknown", "Note": "Error"})
-    df_table2 = pd.DataFrame(adf_rows).set_index("Coin")
-    df_table2_numeric = df_table2.copy()
-    for col in ["ADF Stat", "p-value"]:
-        df_table2_numeric[col] = pd.to_numeric(df_table2_numeric[col], errors="coerce")
-    st.dataframe(df_table2_numeric.style.format("{:.4f}", subset=["ADF Stat", "p-value"]))
-
-    st.subheader("Table 3: Fractional Integration Estimates (Hurst-based)")
-    hurst_rows = []
-    for coin in STABLECOINS:
-        try:
-            df = pd.read_csv(DATA_DIR / f"history_{coin}.csv")
-            dev = df["Price"] - 1.0
-            if dev.nunique() <= 1:
-                continue
-            hurst = nolds.hurst_rs(dev.dropna().values)
-            d_est = hurst - 0.5
-            hurst_rows.append({"Coin": coin, "Hurst (H)": hurst, "Estimated d (H-0.5)": d_est})
-        except Exception as e:
-            st.warning(f"Fractional integration failed for {coin}: {e}")
-    df_hurst = pd.DataFrame(hurst_rows).set_index("Coin")
-    st.dataframe(df_hurst.style.format("{:.4f}"))
-    st.markdown("*Note: d is approximated as Hurst exponent (H) - 0.5 using `nolds`.*")
 
 # ---------------- LOCAL WHITTLE ANALYSIS ----------------
 elif page == "Local Whittle Analysis":
@@ -300,3 +219,4 @@ elif page == "Local Whittle Analysis":
             ax.grid(True, color='gray', linestyle='--', linewidth=0.5)
             ax.legend()
             st.pyplot(fig)
+
